@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: task-management-api
+  config:
+    import: "optional:file:./.env[.properties]"
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/task_management}
+    username: ${DB_USERNAME:task_app}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:11MB}
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:task-management-api}
+    ttl: ${JWT_TTL:15m}
+    cookie-name: ${JWT_COOKIE_NAME:task}
+    cookie-secure: ${COOKIE_SECURE}
+    cookie-same-site: ${COOKIE_SAME_SITE}
+  security:
+    allowed-origin: ${FRONTEND_ORIGIN}
+    require-https: ${REQUIRE_HTTPS}
+  rate-limit:
+    login-capacity: ${LOGIN_RATE_CAPACITY:10}
+    login-refill: ${LOGIN_RATE_REFILL:10}
+    login-period: ${LOGIN_RATE_PERIOD:1m}
+    api-capacity: ${API_RATE_CAPACITY:120}
+    api-refill: ${API_RATE_REFILL:120}
+    api-period: ${API_RATE_PERIOD:1m}
+  storage:
+    directory: ${ATTACHMENT_STORAGE:./data/attachments}
+  seed:
+    enabled: ${SEED_USERS:true}
+    password: ${SEED_PASSWORD:SEED_PASSWORD}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"
+  level:
+    com.example.taskmanagement: INFO

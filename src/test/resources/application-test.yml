@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:task_management;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  main:
+    banner-mode: off
+
+app:
+  jwt:
+    secret: test-only-jwt-secret-with-more-than-thirty-two-characters
+    issuer: task-management-test
+    ttl: 15m
+    cookie-name: TASK_ACCESS
+    cookie-secure: false
+    cookie-same-site: Strict
+  security:
+    allowed-origin: http://localhost:4200
+    require-https: false
+  rate-limit:
+    login-capacity: 1000
+    login-refill: 1000
+    login-period: 1m
+    api-capacity: 1000
+    api-refill: 1000
+    api-period: 1m
+  storage:
+    directory: ${java.io.tmpdir}/task-management-integration-tests
+  seed:
+    enabled: true
+    password: TestPassword123!
+
+logging:
+  level:
+    com.example.taskmanagement: WARN
