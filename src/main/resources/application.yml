@@ -58,6 +58,11 @@ app:
   seed:
     enabled: ${SEED_USERS:true}
     password: ${SEED_PASSWORD:SEED_PASSWORD}
+  bootstrap-admin:
+    email: ${BOOTSTRAP_ADMIN_EMAIL:bibalefai@gmail.com}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:W@tchd0gs_task_flow223}
+    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:BI BALEFAI MONDESIR}
+    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:BOLI}
 
 logging:
   pattern:

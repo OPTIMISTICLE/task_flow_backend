@@ -29,12 +29,14 @@ public class TaskController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER','WORKER')")
     public List<TaskResponse> list(@RequestParam(required = false) TaskStatus status,
                                    @AuthenticationPrincipal AuthenticatedUser user) {
         return service.list(user, status);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER','WORKER')")
     public TaskResponse get(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
         return service.get(id, user);
     }

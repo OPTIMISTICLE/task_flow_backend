@@ -38,6 +38,12 @@ public class AuditService {
                 action, null, null, "DENIED", details);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void denied(AuthenticatedUser actor, String action, String resourceType, UUID resourceId, String details) {
+        record(actor == null ? null : actor.id(), actor == null ? null : actor.getUsername(),
+                action, resourceType, resourceId, "DENIED", details);
+    }
+
     private void record(UUID actorId, String actorEmail, String action, String resourceType,
                         UUID resourceId, String outcome, String details) {
         String safeDetails = details == null ? null : details.substring(0, Math.min(details.length(), 1000));

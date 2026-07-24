@@ -57,6 +57,7 @@ public class JwtService {
                 .id(UUID.randomUUID().toString())
                 .claim("email", user.email())
                 .claim("role", user.role().name())
+                .claim("ver", user.authVersion())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

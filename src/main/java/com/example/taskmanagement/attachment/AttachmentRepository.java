@@ -8,6 +8,8 @@ import java.util.UUID;
 
 public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
 
+    boolean existsByUploadedById(UUID uploadedById);
+
     List<Attachment> findByTaskIdOrderByUploadedAtAsc(UUID taskId);
 
     Optional<Attachment> findByIdAndTaskId(UUID id, UUID taskId);

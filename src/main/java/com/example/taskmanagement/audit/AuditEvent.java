@@ -63,4 +63,40 @@ public class AuditEvent {
             occurredAt = Instant.now();
         }
     }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getActorId() {
+        return actorId;
+    }
+
+    public String getActorEmail() {
+        return actorEmail;
+    }
+
+    public String getAction() {
+        return action;
+    }
+
+    public String getResourceType() {
+        return resourceType;
+    }
+
+    public String getResourceId() {
+        return resourceId;
+    }
+
+    public String getOutcome() {
+        return outcome;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public Instant getOccurredAt() {
+        return occurredAt;
+    }
 }

@@ -10,10 +10,11 @@ public record AuthUserResponse(
         String firstName,
         String lastName,
         String displayName,
-        UserRole role
+        UserRole role,
+        boolean mustChangePassword
 ) {
     public static AuthUserResponse from(AuthenticatedUser user) {
         return new AuthUserResponse(user.id(), user.email(), user.firstName(), user.lastName(),
-                user.displayName(), user.role());
+                user.displayName(), user.role(), user.mustChangePassword());
     }
 }

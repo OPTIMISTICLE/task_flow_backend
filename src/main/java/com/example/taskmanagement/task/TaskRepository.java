@@ -9,6 +9,14 @@ import java.util.UUID;
 
 public interface TaskRepository extends JpaRepository<TaskEntity, UUID> {
 
+    boolean existsByCreatorId(UUID creatorId);
+
+    boolean existsByAssigneeId(UUID assigneeId);
+
+    boolean existsByCreatorIdAndProgressStatusNot(UUID creatorId, TaskProgressStatus status);
+
+    boolean existsByAssigneeIdAndProgressStatusNot(UUID assigneeId, TaskProgressStatus status);
+
     @EntityGraph(attributePaths = {"creator", "assignee"})
     List<TaskEntity> findByCreatorIdOrderByCreatedAtDesc(UUID creatorId);
 

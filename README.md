@@ -8,7 +8,9 @@ also contains the end-user guide.
 ## What the backend does
 
 - authenticates users with a JWT stored in an `HttpOnly` cookie;
-- applies `MANAGER` and `WORKER` role permissions;
+- applies isolated `ADMIN`, `MANAGER`, and `WORKER` role permissions;
+- provides paged account search, profile and role updates, activation controls, one-time temporary
+  passwords, and per-user audit timelines for administrators;
 - limits managers to tasks they created and workers to tasks assigned to them;
 - validates task assignment and progress transitions;
 - calculates `OVERDUE` from a task deadline without storing it as a progress state;
@@ -88,6 +90,10 @@ manager, not in source control.
 | `JWT_TTL`                     | Optional access-token lifetime; defaults to `15m`               |
 | `SEED_USERS`                  | Creates the demo users when enabled and the user table is empty |
 | `SEED_PASSWORD`               | Initial password shared by the seeded demo accounts             |
+| `BOOTSTRAP_ADMIN_EMAIL`       | Initial administrator email when no active administrator exists |
+| `BOOTSTRAP_ADMIN_PASSWORD`    | Initial administrator password; 15 to 200 characters            |
+| `BOOTSTRAP_ADMIN_FIRST_NAME`  | Initial administrator first name                                |
+| `BOOTSTRAP_ADMIN_LAST_NAME`   | Initial administrator last name                                 |
 | `FRONTEND_ORIGIN`             | Exact allowed browser origin, without a trailing slash          |
 | `COOKIE_SECURE`               | Must be `true` in HTTPS production environments                 |
 | `COOKIE_SAME_SITE`            | Cookie SameSite policy; production uses `Strict`                |
@@ -131,7 +137,16 @@ database or Supabase Storage.
 | `GET`   | `/api/auth/csrf`                             | Public; initializes CSRF protection |
 | `POST`  | `/api/auth/login`                            | Public with a CSRF token            |
 | `GET`   | `/api/auth/me`                               | Authenticated user                  |
+| `POST`  | `/api/auth/change-password`                  | Authenticated user                  |
 | `POST`  | `/api/auth/logout`                           | Authenticated with a CSRF token     |
+| `GET`   | `/api/admin/users`                           | Administrator directory             |
+| `POST`  | `/api/admin/users`                           | Administrator account creation      |
+| `GET`   | `/api/admin/users/{id}`                      | Administrator                       |
+| `PATCH` | `/api/admin/users/{id}`                      | Administrator profile/role update   |
+| `POST`  | `/api/admin/users/{id}/activate`             | Administrator                       |
+| `POST`  | `/api/admin/users/{id}/deactivate`           | Administrator                       |
+| `POST`  | `/api/admin/users/{id}/reset-password`       | Administrator                       |
+| `GET`   | `/api/admin/users/{id}/audit`                | Administrator timeline              |
 | `GET`   | `/api/users?role=WORKER`                     | Manager                             |
 | `GET`   | `/api/tasks`                                 | Tasks visible to the current user   |
 | `GET`   | `/api/tasks/{id}`                            | Authorized creator or assignee      |
@@ -184,10 +199,26 @@ with a PKCS12 keystore. Render terminates public TLS before forwarding the reque
 After deployment, place the Render origin in `frontend/vercel.json` so browser `/api` requests are
 proxied to this service.
 
+### Bootstrap the first administrator
+
+When no active administrator exists, startup requires all four `BOOTSTRAP_ADMIN_*` variables. The
+created account is active but restricted to the password-change flow until it replaces the bootstrap
+password. After that first successful change, remove `BOOTSTRAP_ADMIN_PASSWORD` from Render. The
+initializer becomes a no-op while an active administrator exists.
+
+Administrators can create users and reset another user's password. The API generates a high-entropy
+temporary password, returns it once with `Cache-Control: no-store`, and stores only its BCrypt hash.
+Deliver that value through an approved private channel; it cannot be retrieved later.
+
+Account safeguards intentionally block self-deactivation, self-demotion, self-reset, removal of the
+last active administrator, deactivation with unfinished role-related tasks, and role changes after any
+task or attachment history. Activation, password, and role changes invalidate previously issued JWTs.
+
 ## Security notes
 
 - Never commit `.env`, database passwords, JWT secrets, or Supabase secret keys.
 - Rotate a secret immediately if it appears in a log, screenshot, chat, commit, or issue.
 - Keep the JWT in its `HttpOnly` cookie; do not return it to or store it in the frontend.
 - Keep the Supabase bucket private and authorize every upload and download through the API.
+- Do not log or retain the clear-text bootstrap or generated temporary passwords.
 - See [`../SECURITY.md`](../SECURITY.md) for the broader security model.

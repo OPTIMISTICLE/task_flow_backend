@@ -52,6 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             AuthenticatedUser user = userDetailsService.loadById(UUID.fromString(jwt.getSubject()));
+            Number tokenVersion = jwt.getClaim("ver");
+            if (tokenVersion == null || tokenVersion.longValue() != user.authVersion()) {
+                return;
+            }
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -29,15 +29,17 @@ public class AuthController {
     private final JwtAuthenticationFilter jwtFilter;
     private final TokenRevocationService revocationService;
     private final AuditService auditService;
+    private final PasswordService passwordService;
 
     public AuthController(AuthenticationManager authenticationManager, JwtService jwtService,
                           JwtAuthenticationFilter jwtFilter, TokenRevocationService revocationService,
-                          AuditService auditService) {
+                          AuditService auditService, PasswordService passwordService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.jwtFilter = jwtFilter;
         this.revocationService = revocationService;
         this.auditService = auditService;
+        this.passwordService = passwordService;
     }
 
     @GetMapping("/csrf")
@@ -65,6 +67,18 @@ public class AuthController {
     @GetMapping("/me")
     public AuthUserResponse me(Authentication authentication) {
         return AuthUserResponse.from((AuthenticatedUser) authentication.getPrincipal());
+    }
+
+    @PostMapping("/change-password")
+    public AuthUserResponse changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                           Authentication authentication, HttpServletResponse response) {
+        AuthenticatedUser currentUser = (AuthenticatedUser) authentication.getPrincipal();
+        AuthenticatedUser updated = passwordService.change(request, currentUser);
+        String token = jwtService.issue(updated);
+        response.addHeader(HttpHeaders.SET_COOKIE,
+                accessCookie(token, jwtService.properties().ttl()).toString());
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        return AuthUserResponse.from(updated);
     }
 
     @PostMapping("/logout")

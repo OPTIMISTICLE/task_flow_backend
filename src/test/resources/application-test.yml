@@ -36,6 +36,11 @@ app:
   seed:
     enabled: true
     password: TestPassword123!
+  bootstrap-admin:
+    email: admin@company.local
+    password: TestAdminPassword123!
+    first-name: Ada
+    last-name: Administrator
 
 logging:
   level:

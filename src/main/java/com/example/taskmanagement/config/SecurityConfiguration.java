@@ -2,6 +2,7 @@ package com.example.taskmanagement.config;
 
 import com.example.taskmanagement.auth.DomainUserDetailsService;
 import com.example.taskmanagement.auth.JwtAuthenticationFilter;
+import com.example.taskmanagement.auth.PasswordChangeRequiredFilter;
 import com.example.taskmanagement.auth.RateLimitFilter;
 import com.example.taskmanagement.auth.RestAccessDeniedHandler;
 import com.example.taskmanagement.auth.RestAuthenticationEntryPoint;
@@ -79,6 +80,7 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            PasswordChangeRequiredFilter passwordChangeRequiredFilter,
             RateLimitFilter rateLimitFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
@@ -113,6 +115,7 @@ public class SecurityConfiguration {
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives("default-src 'none'; frame-ancestors 'none'")))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(passwordChangeRequiredFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(rateLimitFilter, JwtAuthenticationFilter.class);
 
         if (securityProperties.requireHttps()) {

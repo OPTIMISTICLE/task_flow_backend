@@ -17,12 +17,15 @@ public record AuthenticatedUser(
         String firstName,
         String lastName,
         UserRole role,
-        boolean active
+        boolean active,
+        boolean mustChangePassword,
+        long authVersion
 ) implements UserDetails {
 
     public static AuthenticatedUser from(User user) {
         return new AuthenticatedUser(user.getId(), user.getEmail(), user.getPasswordHash(),
-                user.getFirstName(), user.getLastName(), user.getRole(), user.isActive());
+                user.getFirstName(), user.getLastName(), user.getRole(), user.isActive(),
+                user.isMustChangePassword(), user.getAuthVersion());
     }
 
     @Override
