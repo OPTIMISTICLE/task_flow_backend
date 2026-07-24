@@ -72,7 +72,7 @@ app:
   mail:
     enabled: ${MAIL_ENABLED:true}
     api-key: ${RESEND_API_KEY:re_BpBsoMEC_F94Gw7viboqd1NiYMvwRrUDV}
-    from: ${MAIL_FROM:bibalefai@gmail.com}
+    from: ${MAIL_FROM:Taskflow <onboarding@resend.dev>}
     frontend-origin: ${FRONTEND_ORIGIN}
 
 logging:
