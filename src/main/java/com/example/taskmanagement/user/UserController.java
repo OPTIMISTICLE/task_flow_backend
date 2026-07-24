@@ -24,7 +24,8 @@ public class UserController {
         if (role != UserRole.WORKER) {
             return List.of();
         }
-        return repository.findByRoleAndActiveTrueOrderByFirstNameAscLastNameAsc(role).stream()
+        return repository.findByRoleAndAccountStatusOrderByFirstNameAscLastNameAsc(
+                        role, UserAccountStatus.ACTIVE).stream()
                 .map(UserSummaryResponse::from)
                 .toList();
     }

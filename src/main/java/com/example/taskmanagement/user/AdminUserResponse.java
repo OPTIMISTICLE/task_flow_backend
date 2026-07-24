@@ -10,10 +10,13 @@ public record AdminUserResponse(
         String lastName,
         String displayName,
         String email,
+        String pendingEmail,
+        Instant emailVerifiedAt,
         String jobTitle,
         String department,
         String phoneNumber,
         UserRole role,
+        UserAccountStatus status,
         boolean active,
         boolean mustChangePassword,
         Instant createdAt,
@@ -21,8 +24,9 @@ public record AdminUserResponse(
 ) {
     public static AdminUserResponse from(User user) {
         return new AdminUserResponse(user.getId(), user.getVersion(), user.getFirstName(), user.getLastName(),
-                user.getDisplayName(), user.getEmail(), user.getJobTitle(), user.getDepartment(),
-                user.getPhoneNumber(), user.getRole(), user.isActive(), user.isMustChangePassword(),
+                user.getDisplayName(), user.getEmail(), user.getPendingEmail(), user.getEmailVerifiedAt(),
+                user.getJobTitle(), user.getDepartment(), user.getPhoneNumber(), user.getRole(),
+                user.getAccountStatus(), user.isActive(), user.isMustChangePassword(),
                 user.getCreatedAt(), user.getUpdatedAt());
     }
 }

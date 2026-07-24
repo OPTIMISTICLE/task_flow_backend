@@ -27,13 +27,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final DomainUserDetailsService userDetailsService;
-    private final TokenRevocationService revocationService;
+    private final SessionService sessionService;
 
     public JwtAuthenticationFilter(JwtService jwtService, DomainUserDetailsService userDetailsService,
-                                   TokenRevocationService revocationService) {
+                                   SessionService sessionService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
-        this.revocationService = revocationService;
+        this.sessionService = sessionService;
     }
 
     @Override
@@ -48,22 +48,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void authenticate(String token, HttpServletRequest request) {
         try {
             Jwt jwt = jwtService.decode(token);
-            if (revocationService.isRevoked(jwt)) {
-                return;
-            }
             AuthenticatedUser user = userDetailsService.loadById(UUID.fromString(jwt.getSubject()));
             Number tokenVersion = jwt.getClaim("ver");
             if (tokenVersion == null || tokenVersion.longValue() != user.authVersion()) {
                 return;
             }
+            UUID sessionId = UUID.fromString(jwt.getClaimAsString("sid"));
+            if (!sessionService.validateAndTouch(sessionId, user.id())) {
+                return;
+            }
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            authentication.setDetails(new AuthSessionDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request), sessionId));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (JwtException | IllegalArgumentException | UsernameNotFoundException exception) {
             log.debug("Rejected invalid JWT cookie: {}", exception.getClass().getSimpleName());
             SecurityContextHolder.clearContext();
         }
+    }
+
+    public record AuthSessionDetails(Object webDetails, UUID sessionId) {
     }
 
     public java.util.Optional<String> findToken(HttpServletRequest request) {

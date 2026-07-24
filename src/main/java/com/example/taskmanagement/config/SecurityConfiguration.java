@@ -65,7 +65,7 @@ public class SecurityConfiguration {
     CorsConfigurationSource corsConfigurationSource(AppSecurityProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(properties.allowedOrigin()));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-XSRF-TOKEN"));
         configuration.setExposedHeaders(List.of("Content-Disposition", "Retry-After"));
         configuration.setAllowCredentials(true);
@@ -102,7 +102,9 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/mfa/challenge",
+                                "/api/auth/invitations/accept", "/api/auth/password-recovery/request",
+                                "/api/auth/password-recovery/complete", "/api/auth/email/confirm").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)

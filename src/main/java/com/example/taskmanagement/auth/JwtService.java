@@ -46,7 +46,7 @@ public class JwtService {
         this.decoder = jwtDecoder;
     }
 
-    public String issue(AuthenticatedUser user) {
+    public String issue(AuthenticatedUser user, UUID sessionId) {
         Instant now = clock.instant();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(properties.issuer())
@@ -57,6 +57,7 @@ public class JwtService {
                 .id(UUID.randomUUID().toString())
                 .claim("email", user.email())
                 .claim("role", user.role().name())
+                .claim("sid", sessionId.toString())
                 .claim("ver", user.authVersion())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();

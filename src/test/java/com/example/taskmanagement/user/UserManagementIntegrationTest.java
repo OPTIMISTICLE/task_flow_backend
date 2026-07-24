@@ -3,6 +3,7 @@ package com.example.taskmanagement.user;
 import com.example.taskmanagement.IntegrationTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.taskmanagement.email.EmailOutboxRepository;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -38,6 +40,9 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private EmailOutboxRepository emailOutboxRepository;
+
     @BeforeEach
     void resetAdministratorCredentials() {
         User admin = userRepository.findByEmailIgnoreCase("admin@company.local").orElseThrow();
@@ -55,13 +60,14 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
                         .content(createUserJson(email, "WORKER")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.user.email").value(email))
-                .andExpect(jsonPath("$.user.mustChangePassword").value(true))
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.mustChangePassword").value(false))
                 .andReturn();
         JsonNode created = objectMapper.readTree(createdResponse.getResponse().getContentAsString());
-        assertTrue(created.get("temporaryPassword").asText().length() >= 15);
-        String userId = created.at("/user/id").asText();
-        long version = created.at("/user/version").asLong();
+        assertFalse(created.has("temporaryPassword"));
+        String userId = created.get("id").asText();
+        long version = created.get("version").asLong();
 
         mockMvc.perform(get("/api/admin/users")
                         .cookie(admin).param("query", email.toUpperCase()).param("role", "WORKER"))
@@ -93,7 +99,7 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void temporaryPasswordRestrictsAccessAndChangingItInvalidatesTheOldCookie() throws Exception {
+    void invitationActivatesTheAccountAndCannotBeReused() throws Exception {
         Cookie admin = establishedAdminCookie();
         String email = "temporary." + UUID.randomUUID() + "@company.local";
         var response = mockMvc.perform(post("/api/admin/users")
@@ -101,24 +107,22 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
                         .content(createUserJson(email, "WORKER")))
                 .andExpect(status().isCreated())
                 .andReturn();
-        JsonNode body = objectMapper.readTree(response.getResponse().getContentAsString());
-        String temporaryPassword = body.get("temporaryPassword").asText();
-        Cookie temporaryCookie = loginWithPassword(email, temporaryPassword, true);
-
-        mockMvc.perform(get("/api/tasks").cookie(temporaryCookie))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
-
-        mockMvc.perform(post("/api/auth/change-password")
-                        .with(csrf()).cookie(temporaryCookie).contentType("application/json")
+        String token = invitationToken(email);
+        String password = "A new private passphrase 2026";
+        mockMvc.perform(post("/api/auth/invitations/accept").with(csrf()).contentType("application/json")
                         .content("""
-                                {"currentPassword":"%s","newPassword":"A new private passphrase 2026"}
-                                """.formatted(temporaryPassword)))
+                                {"token":"%s","password":"%s"}
+                                """.formatted(token, password)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mustChangePassword").value(false));
+                .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(get("/api/auth/me").cookie(temporaryCookie))
-                .andExpect(status().isUnauthorized());
+        Cookie cookie = loginWithPassword(email, password, false);
+        mockMvc.perform(get("/api/tasks").cookie(cookie)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/auth/invitations/accept").with(csrf()).contentType("application/json")
+                        .content("""
+                                {"token":"%s","password":"Another private passphrase 2026"}
+                                """.formatted(token)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -149,9 +153,15 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
                         .with(csrf()).cookie(admin).contentType("application/json")
                         .content(createUserJson(email, "WORKER")))
                 .andExpect(status().isCreated()).andReturn();
-        JsonNode userBody = objectMapper.readTree(createUser.getResponse().getContentAsString()).get("user");
+        JsonNode userBody = objectMapper.readTree(createUser.getResponse().getContentAsString());
         String userId = userBody.get("id").asText();
-        long version = userBody.get("version").asLong();
+        String invitationToken = invitationToken(email);
+        mockMvc.perform(post("/api/auth/invitations/accept").with(csrf()).contentType("application/json")
+                        .content("""
+                                {"token":"%s","password":"Assigned worker passphrase 2026"}
+                                """.formatted(invitationToken)))
+                .andExpect(status().isOk());
+        long version = userRepository.findById(UUID.fromString(userId)).orElseThrow().getVersion();
 
         mockMvc.perform(post("/api/tasks").with(csrf()).cookie(manager).contentType("application/json")
                         .content("""
@@ -214,5 +224,14 @@ class UserManagementIntegrationTest extends IntegrationTestSupport {
                   "role": "%s"
                 }
                 """.formatted(email, role);
+    }
+
+    private String invitationToken(String email) {
+        String body = emailOutboxRepository.findTopByRecipientOrderByCreatedAtDesc(email)
+                .orElseThrow().getTextBody();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("token=([A-Za-z0-9_-]+)").matcher(body);
+        assertTrue(matcher.find());
+        return matcher.group(1);
     }
 }

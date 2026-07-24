@@ -7,10 +7,12 @@ also contains the end-user guide.
 
 ## What the backend does
 
-- authenticates users with a JWT stored in an `HttpOnly` cookie;
+- authenticates users with a JWT stored in an `HttpOnly` cookie and a database-backed session;
 - applies isolated `ADMIN`, `MANAGER`, and `WORKER` role permissions;
-- provides paged account search, profile and role updates, activation controls, one-time temporary
-  passwords, and per-user audit timelines for administrators;
+- provides paged account search, invitation-only onboarding, profile and role updates, activation
+  controls, recovery emails, MFA resets, and per-user audit timelines for administrators;
+- supports 12-hour sessions, user-controlled session revocation, TOTP MFA with recovery codes, and
+  email notifications for successful sign-ins and critical security changes;
 - limits managers to tasks they created and workers to tasks assigned to them;
 - validates task assignment and progress transitions;
 - calculates `OVERDUE` from a task deadline without storing it as a progress state;
@@ -87,7 +89,12 @@ manager, not in source control.
 | `DB_USERNAME`                 | PostgreSQL login name                                           |
 | `DB_PASSWORD`                 | PostgreSQL database password                                    |
 | `JWT_SECRET`                  | Signing secret containing at least 32 random bytes              |
-| `JWT_TTL`                     | Optional access-token lifetime; defaults to `15m`               |
+| `JWT_TTL`                     | JWT/cookie lifetime; use `12h` to match the session lifetime    |
+| `SESSION_TTL`                 | Persistent session lifetime; defaults to `12h`                  |
+| `MFA_ENCRYPTION_KEY`          | Base64-encoded 32-byte AES key for TOTP secrets                  |
+| `MAIL_ENABLED`                | Enables queued Resend delivery                                  |
+| `RESEND_API_KEY`              | Backend-only Resend API key                                     |
+| `MAIL_FROM`                   | Verified Resend sender                                          |
 | `SEED_USERS`                  | Creates the demo users when enabled and the user table is empty |
 | `SEED_PASSWORD`               | Initial password shared by the seeded demo accounts             |
 | `BOOTSTRAP_ADMIN_EMAIL`       | Initial administrator email when no active administrator exists |
@@ -105,6 +112,15 @@ manager, not in source control.
 | `SUPABASE_STORAGE_BUCKET`     | Private storage bucket; defaults to `task-attachments`          |
 
 The complete safe template is [`../.env.example`](../.env.example).
+
+Generate the required MFA encryption key once and keep it stable across deployments:
+
+```powershell
+openssl rand -base64 32
+```
+
+Store that output as `MFA_ENCRYPTION_KEY`. Rotating it without a credential migration makes existing
+TOTP enrollments unreadable.
 
 ## Supabase
 
@@ -136,9 +152,19 @@ database or Supabase Storage.
 | ------- | -------------------------------------------- | ----------------------------------- |
 | `GET`   | `/api/auth/csrf`                             | Public; initializes CSRF protection |
 | `POST`  | `/api/auth/login`                            | Public with a CSRF token            |
+| `POST`  | `/api/auth/mfa/challenge`                    | Public MFA login completion         |
+| `POST`  | `/api/auth/invitations/accept`               | Public invitation completion        |
+| `POST`  | `/api/auth/password-recovery/request`        | Public, enumeration-safe recovery   |
+| `POST`  | `/api/auth/password-recovery/complete`       | Public recovery completion          |
+| `POST`  | `/api/auth/email/confirm`                    | Public email confirmation           |
 | `GET`   | `/api/auth/me`                               | Authenticated user                  |
 | `POST`  | `/api/auth/change-password`                  | Authenticated user                  |
 | `POST`  | `/api/auth/logout`                           | Authenticated with a CSRF token     |
+| `GET`   | `/api/auth/sessions`                         | Current user's sessions             |
+| `DELETE`| `/api/auth/sessions/{id}`                    | Revoke one owned session            |
+| `GET`   | `/api/auth/mfa`                              | Current user's MFA status           |
+| `POST`  | `/api/auth/mfa/setup`                        | Start TOTP enrollment               |
+| `POST`  | `/api/auth/mfa/confirm`                      | Enable TOTP and issue recovery codes|
 | `GET`   | `/api/admin/users`                           | Administrator directory             |
 | `POST`  | `/api/admin/users`                           | Administrator account creation      |
 | `GET`   | `/api/admin/users/{id}`                      | Administrator                       |
@@ -146,6 +172,8 @@ database or Supabase Storage.
 | `POST`  | `/api/admin/users/{id}/activate`             | Administrator                       |
 | `POST`  | `/api/admin/users/{id}/deactivate`           | Administrator                       |
 | `POST`  | `/api/admin/users/{id}/reset-password`       | Administrator                       |
+| `POST`  | `/api/admin/users/{id}/resend-invitation`    | Administrator                       |
+| `POST`  | `/api/admin/users/{id}/reset-mfa`            | Administrator                       |
 | `GET`   | `/api/admin/users/{id}/audit`                | Administrator timeline              |
 | `GET`   | `/api/users?role=WORKER`                     | Manager                             |
 | `GET`   | `/api/tasks`                                 | Tasks visible to the current user   |
@@ -206,9 +234,10 @@ created account is active but restricted to the password-change flow until it re
 password. After that first successful change, remove `BOOTSTRAP_ADMIN_PASSWORD` from Render. The
 initializer becomes a no-op while an active administrator exists.
 
-Administrators can create users and reset another user's password. The API generates a high-entropy
-temporary password, returns it once with `Cache-Control: no-store`, and stores only its BCrypt hash.
-Deliver that value through an approved private channel; it cannot be retrieved later.
+Administrators create pending users. TaskFlow queues a single-use invitation link that expires after
+24 hours; the user chooses their own password when accepting it. Password-reset links expire after 30
+minutes. Configure `MAIL_ENABLED=true`, `RESEND_API_KEY`, and a verified `MAIL_FROM` sender in Render.
+The email outbox retries transient delivery failures and uses an idempotency key for each message.
 
 Account safeguards intentionally block self-deactivation, self-demotion, self-reset, removal of the
 last active administrator, deactivation with unfinished role-related tasks, and role changes after any
@@ -220,5 +249,5 @@ task or attachment history. Activation, password, and role changes invalidate pr
 - Rotate a secret immediately if it appears in a log, screenshot, chat, commit, or issue.
 - Keep the JWT in its `HttpOnly` cookie; do not return it to or store it in the frontend.
 - Keep the Supabase bucket private and authorize every upload and download through the API.
-- Do not log or retain the clear-text bootstrap or generated temporary passwords.
+- Never log invitation/reset tokens, recovery codes, clear-text passwords, or decrypted TOTP secrets.
 - See [`../SECURITY.md`](../SECURITY.md) for the broader security model.

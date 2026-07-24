@@ -8,16 +8,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
-
     Optional<User> findByEmailIgnoreCase(String email);
-
     boolean existsByEmailIgnoreCase(String email);
-
     boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
-
-    boolean existsByRoleAndActiveTrue(UserRole role);
-
-    long countByRoleAndActiveTrue(UserRole role);
-
-    List<User> findByRoleAndActiveTrueOrderByFirstNameAscLastNameAsc(UserRole role);
+    boolean existsByPendingEmailIgnoreCase(String email);
+    boolean existsByPendingEmailIgnoreCaseAndIdNot(String email, UUID id);
+    boolean existsByRoleAndAccountStatus(UserRole role, UserAccountStatus status);
+    long countByRoleAndAccountStatus(UserRole role, UserAccountStatus status);
+    List<User> findByRoleAndAccountStatusOrderByFirstNameAscLastNameAsc(
+            UserRole role, UserAccountStatus status);
 }

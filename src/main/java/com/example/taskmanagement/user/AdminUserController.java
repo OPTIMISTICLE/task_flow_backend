@@ -37,12 +37,12 @@ public class AdminUserController {
     public AdminUserPageResponse list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) UserRole role,
-            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) UserAccountStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
-        return service.list(query, role, active, page, size, sort, direction);
+        return service.list(query, role, status, page, size, sort, direction);
     }
 
     @GetMapping("/{id}")
@@ -51,7 +51,7 @@ public class AdminUserController {
     }
 
     @PostMapping
-    public ResponseEntity<TemporaryPasswordResponse> create(@Valid @RequestBody CreateUserRequest request,
+    public ResponseEntity<AdminUserResponse> create(@Valid @RequestBody CreateUserRequest request,
                                                             @AuthenticationPrincipal AuthenticatedUser actor) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
@@ -77,12 +77,26 @@ public class AdminUserController {
     }
 
     @PostMapping("/{id}/reset-password")
-    public ResponseEntity<TemporaryPasswordResponse> resetPassword(
+    public ResponseEntity<AdminUserResponse> resetPassword(
             @PathVariable UUID id, @Valid @RequestBody UserVersionRequest request,
             @AuthenticationPrincipal AuthenticatedUser actor) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(service.resetPassword(id, request, actor));
+    }
+
+    @PostMapping("/{id}/resend-invitation")
+    public AdminUserResponse resendInvitation(@PathVariable UUID id,
+                                              @Valid @RequestBody UserVersionRequest request,
+                                              @AuthenticationPrincipal AuthenticatedUser actor) {
+        return service.resendInvitation(id, request, actor);
+    }
+
+    @PostMapping("/{id}/reset-mfa")
+    public AdminUserResponse resetMfa(@PathVariable UUID id,
+                                      @Valid @RequestBody UserVersionRequest request,
+                                      @AuthenticationPrincipal AuthenticatedUser actor) {
+        return service.resetMfa(id, request, actor);
     }
 
     @GetMapping("/{id}/audit")

@@ -36,11 +36,22 @@ app:
   seed:
     enabled: true
     password: TestPassword123!
+  identity:
+    session-ttl: 12h
+    invitation-ttl: 24h
+    password-reset-ttl: 30m
+    login-challenge-ttl: 5m
+    mfa-encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   bootstrap-admin:
     email: admin@company.local
     password: TestAdminPassword123!
-    first-name: Ada
-    last-name: Administrator
+    first-name: Alice
+    last-name: Admin
+  mail:
+    enabled: false
+    api-key: test-only
+    from: TaskFlow <no-reply@example.test>
+    frontend-origin: http://localhost:4200
 
 logging:
   level:

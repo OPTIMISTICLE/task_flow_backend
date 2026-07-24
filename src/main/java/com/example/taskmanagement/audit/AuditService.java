@@ -28,6 +28,11 @@ public class AuditService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void success(String actorEmail, String action, String resourceType, UUID resourceId, String details) {
+        record(null, actorEmail, action, resourceType, resourceId, "SUCCESS", details);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failure(String actorEmail, String action, String resourceType, UUID resourceId, String details) {
         record(null, actorEmail, action, resourceType, resourceId, "FAILURE", details);
     }

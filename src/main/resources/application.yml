@@ -34,7 +34,7 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:task-management-api}
-    ttl: ${JWT_TTL:15m}
+    ttl: ${JWT_TTL:12h}
     cookie-name: ${JWT_COOKIE_NAME:task}
     cookie-secure: ${COOKIE_SECURE}
     cookie-same-site: ${COOKIE_SAME_SITE}
@@ -58,11 +58,22 @@ app:
   seed:
     enabled: ${SEED_USERS:true}
     password: ${SEED_PASSWORD:SEED_PASSWORD}
+  identity:
+    session-ttl: ${SESSION_TTL:12h}
+    invitation-ttl: ${INVITATION_TTL:24h}
+    password-reset-ttl: ${PASSWORD_RESET_TTL:30m}
+    login-challenge-ttl: ${MFA_CHALLENGE_TTL:5m}
+    mfa-encryption-key: ${MFA_ENCRYPTION_KEY:}
   bootstrap-admin:
-    email: ${BOOTSTRAP_ADMIN_EMAIL:bibalefai@gmail.com}
-    password: ${BOOTSTRAP_ADMIN_PASSWORD:W@tchd0gs_task_flow223}
-    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:BI BALEFAI MONDESIR}
-    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:BOLI}
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:}
+    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    api-key: ${RESEND_API_KEY:}
+    from: ${MAIL_FROM:}
+    frontend-origin: ${FRONTEND_ORIGIN}
 
 logging:
   pattern:

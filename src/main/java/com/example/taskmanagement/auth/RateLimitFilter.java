@@ -45,7 +45,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        boolean login = "/api/auth/login".equals(request.getRequestURI());
+        boolean login = "/api/auth/login".equals(request.getRequestURI())
+                || "/api/auth/mfa/challenge".equals(request.getRequestURI());
         String identity = login ? request.getRemoteAddr() : authenticatedIdentity(request);
         Map<String, Bucket> buckets = login ? loginBuckets : apiBuckets;
         Bucket bucket = buckets.computeIfAbsent(identity, ignored -> newBucket(login));
