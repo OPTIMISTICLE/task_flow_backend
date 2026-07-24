@@ -1,51 +1,48 @@
 # TaskFlow backend
 
-This directory contains the Spring Boot REST API for TaskFlow. It is responsible for authentication,
-authorization, users, tasks, attachments, audit events, database migrations, and all business rules.
-The Angular client is documented separately in [`../frontend/README.md`](../frontend/README.md), which
-also contains the end-user guide.
+TaskFlow's backend is a Spring Boot REST API for a company task-management workspace. It owns
+authentication, authorization, user administration, task rules, attachments, audit events, email
+delivery, and database migrations. The Angular client and end-user guide are maintained in the
+[TaskFlow frontend repository](https://github.com/OPTIMISTICLE/task_flow_frontend).
 
-## What the backend does
+## System overview
 
-- authenticates users with a JWT stored in an `HttpOnly` cookie and a database-backed session;
-- applies isolated `ADMIN`, `MANAGER`, and `WORKER` role permissions;
-- provides paged account search, invitation-only onboarding, profile and role updates, activation
-  controls, recovery emails, MFA resets, and per-user audit timelines for administrators;
-- supports 12-hour sessions, user-controlled session revocation, TOTP MFA with recovery codes, and
-  email notifications for successful sign-ins and critical security changes;
-- limits managers to tasks they created and workers to tasks assigned to them;
-- validates task assignment and progress transitions;
-- calculates `OVERDUE` from a task deadline without storing it as a progress state;
-- stores metadata in PostgreSQL and applies schema changes with Flyway;
-- stores attachments locally or in a private Supabase Storage bucket;
-- protects mutations with CSRF validation and records security-relevant audit events;
-- returns structured problem responses without exposing stack traces to API clients.
+- `ADMIN` users manage accounts, invitations, recovery, activation, MFA resets, and user audit
+  history. Administrators do not have access to task data.
+- `MANAGER` users create tasks, assign active workers, and see only tasks they created.
+- `WORKER` users see only their assigned tasks and control their progress.
+- Authentication uses a signed JWT in an `HttpOnly` cookie plus a database-backed 12-hour session.
+- Browser mutations require the CSRF cookie/header pair, and CORS accepts one configured frontend
+  origin.
+- Optional TOTP MFA includes single-use recovery codes and per-device session revocation.
+- PostgreSQL stores application data; Flyway applies every schema change.
+- Attachments are stored on the local filesystem or in a private Supabase Storage bucket.
+- Invitation, recovery, confirmation, and security emails are queued in a transactional outbox and
+  delivered through the Gmail API over HTTPS.
 
-## Technology
+Task progress is persisted as `ASSIGNED`, `IN_PROGRESS`, or `COMPLETED`. `OVERDUE` is calculated for
+unfinished tasks whose deadline has passed. A worker can move from Assigned to In progress or
+Completed, and from In progress to Completed. Completed tasks are final.
 
-- Java 17 source compatibility;
-- Spring Boot 3.5 and Spring Security;
-- Spring Data JPA with PostgreSQL;
-- Flyway database migrations;
-- Maven Wrapper;
-- H2 in PostgreSQL compatibility mode for integration tests;
-- Docker deployment on Java 21.
+## Technology and layout
 
-## Directory map
+- Java 17 source compatibility, with Java 17 or newer supported at runtime;
+- Spring Boot 3.5, Spring Security, Spring Data JPA, and Jakarta Validation;
+- PostgreSQL and versioned Flyway migrations;
+- Maven Wrapper and H2 integration tests in PostgreSQL compatibility mode;
+- multi-stage Docker image running on Java 21.
 
 ```text
 src/main/java/com/example/taskmanagement/
-  attachment/   Attachment authorization and storage implementations
-  audit/        Persistent security and domain audit events
-  auth/         Login, logout, JWT cookies, and authenticated-user loading
-  common/       Shared API errors and exception handling
-  config/       Security and application configuration
-  task/         Task API, business rules, and persistence
-  user/         User API and persistence
+  attachment/   Protected attachment metadata and storage providers
+  audit/        Security and domain audit events
+  auth/         Login, sessions, JWT cookies, MFA, and password flows
+  common/       Problem responses and shared exception handling
+  config/       Application and security configuration
+  task/         Task API, rules, and persistence
+  user/         User administration and worker directory
 src/main/resources/
-  db/migration/ Flyway schema migrations
-  application.yml
-  application-prod.yml
+  db/migration/ Versioned Flyway migrations
 src/test/       Integration and application tests
 Dockerfile      Render-compatible multi-stage image
 ```
@@ -55,81 +52,97 @@ Dockerfile      Render-compatible multi-stage image
 ### Requirements
 
 - Java 17 or newer;
-- Docker with Docker Compose for the repository's local PostgreSQL service.
+- PostgreSQL 17 or a compatible PostgreSQL server;
+- PowerShell on Windows for the commands below.
 
-From the repository root, copy the safe environment template and start PostgreSQL:
+When this repository is checked out inside the complete TaskFlow workspace, the parent
+`docker-compose.yml` can start PostgreSQL with `docker compose up -d postgres`. A standalone clone
+can use any PostgreSQL instance whose database and credentials match `DB_URL`, `DB_USERNAME`, and
+`DB_PASSWORD`.
 
-```powershell
-Copy-Item .env.example .env
-Copy-Item .env backend\.env
-docker compose up -d postgres
+Create an ignored `.env` in the backend repository root. The following is a safe local template;
+replace every angle-bracket placeholder and never commit the resulting file:
+
+```properties
+DB_URL=jdbc:postgresql://localhost:5432/task_management
+DB_USERNAME=task_app
+DB_PASSWORD=<local-database-password>
+JWT_SECRET=<at-least-32-random-bytes>
+MFA_ENCRYPTION_KEY=<base64-encoded-32-byte-key>
+FRONTEND_ORIGIN=http://localhost:4200
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=Strict
+REQUIRE_HTTPS=false
+SEED_USERS=true
+SEED_PASSWORD=<strong-demo-password>
+MAIL_ENABLED=false
+ATTACHMENT_STORAGE_PROVIDER=local
+ATTACHMENT_STORAGE=./data/attachments
 ```
 
-Replace every placeholder secret before starting the application. The root `.env` is read by Docker
-Compose, while `backend/.env` is imported by Spring Boot when the application starts from this
-directory. Neither file should be committed.
-
-Start the API on `http://localhost:8080`:
+Generate stable application keys, for example:
 
 ```powershell
-Set-Location backend
-.\mvnw.cmd spring-boot:run
-```
-
-On Unix-like systems, use `./mvnw spring-boot:run`.
-
-## Configuration
-
-Important environment variables are listed below. Keep secrets in the deployment platform's secret
-manager, not in source control.
-
-| Variable                      | Purpose                                                         |
-| ----------------------------- | --------------------------------------------------------------- |
-| `DB_URL`                      | JDBC PostgreSQL URL, including the database name                |
-| `DB_USERNAME`                 | PostgreSQL login name                                           |
-| `DB_PASSWORD`                 | PostgreSQL database password                                    |
-| `JWT_SECRET`                  | Signing secret containing at least 32 random bytes              |
-| `JWT_TTL`                     | JWT/cookie lifetime; use `12h` to match the session lifetime    |
-| `SESSION_TTL`                 | Persistent session lifetime; defaults to `12h`                  |
-| `MFA_ENCRYPTION_KEY`          | Base64-encoded 32-byte AES key for TOTP secrets                  |
-| `MAIL_ENABLED`                | Enables queued Gmail API delivery                               |
-| `MAIL_FROM_NAME`              | Sender display name; defaults to `TaskFlow`                     |
-| `GMAIL_SENDER_EMAIL`          | Gmail account used to send system mail                          |
-| `GMAIL_CLIENT_ID`             | Backend-only Google OAuth client ID                             |
-| `GMAIL_CLIENT_SECRET`         | Backend-only Google OAuth client secret                         |
-| `GMAIL_REFRESH_TOKEN`         | Backend-only offline token with the `gmail.send` scope          |
-| `SEED_USERS`                  | Creates the demo users when enabled and the user table is empty |
-| `SEED_PASSWORD`               | Initial password shared by the seeded demo accounts             |
-| `BOOTSTRAP_ADMIN_EMAIL`       | Initial administrator email when no active administrator exists |
-| `BOOTSTRAP_ADMIN_PASSWORD`    | Initial administrator password; 15 to 200 characters            |
-| `BOOTSTRAP_ADMIN_FIRST_NAME`  | Initial administrator first name                                |
-| `BOOTSTRAP_ADMIN_LAST_NAME`   | Initial administrator last name                                 |
-| `FRONTEND_ORIGIN`             | Exact allowed browser origin, without a trailing slash          |
-| `COOKIE_SECURE`               | Must be `true` in HTTPS production environments                 |
-| `COOKIE_SAME_SITE`            | Cookie SameSite policy; production uses `Strict`                |
-| `REQUIRE_HTTPS`               | Requires forwarded/public HTTPS when `true`                     |
-| `ATTACHMENT_STORAGE_PROVIDER` | `local` or `supabase`                                           |
-| `ATTACHMENT_STORAGE`          | Local attachment directory when the provider is `local`         |
-| `SUPABASE_URL`                | Supabase project URL when using Supabase Storage                |
-| `SUPABASE_SECRET_KEY`         | Backend-only Supabase secret key                                |
-| `SUPABASE_STORAGE_BUCKET`     | Private storage bucket; defaults to `task-attachments`          |
-
-The complete safe template is [`../.env.example`](../.env.example).
-
-Generate the required MFA encryption key once and keep it stable across deployments:
-
-```powershell
+openssl rand -base64 48
 openssl rand -base64 32
 ```
 
-Store that output as `MFA_ENCRYPTION_KEY`. Rotating it without a credential migration makes existing
-TOTP enrollments unreadable.
+Use the first value for `JWT_SECRET` and the second for `MFA_ENCRYPTION_KEY`. Rotating the MFA key
+without migrating credentials makes existing TOTP enrollments unreadable.
+
+Run the API from the repository root:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+On Unix-like systems, use `./mvnw spring-boot:run`. The API listens on
+`http://localhost:8080` unless `SERVER_PORT` or `PORT` is set.
+
+## Configuration reference
+
+Keep production secrets in the hosting platform's secret manager. Render values should be entered
+without shell quotes or trailing spaces.
+
+| Variable | Purpose |
+| --- | --- |
+| `DB_URL` | Complete JDBC PostgreSQL URL, including the database name |
+| `DB_USERNAME` | PostgreSQL login name |
+| `DB_PASSWORD` | PostgreSQL password |
+| `JWT_SECRET` | JWT signing secret containing at least 32 random bytes |
+| `JWT_TTL` | JWT/cookie lifetime; normally `12h` |
+| `SESSION_TTL` | Persistent session lifetime; defaults to `12h` |
+| `INVITATION_TTL` | Invitation lifetime; defaults to `24h` |
+| `PASSWORD_RESET_TTL` | Recovery-link lifetime; defaults to `30m` |
+| `MFA_CHALLENGE_TTL` | Login MFA challenge lifetime; defaults to `5m` |
+| `MFA_ENCRYPTION_KEY` | Stable Base64-encoded 32-byte AES key for TOTP secrets |
+| `FRONTEND_ORIGIN` | Exact browser origin, without a trailing slash |
+| `COOKIE_SECURE` | Must be `true` for an HTTPS production frontend |
+| `COOKIE_SAME_SITE` | Authentication cookie SameSite policy; normally `Strict` |
+| `REQUIRE_HTTPS` | Requires the public/forwarded request scheme to be HTTPS |
+| `SEED_USERS` | Creates demo accounts when enabled and the user table is empty |
+| `SEED_PASSWORD` | Initial password shared by seeded demo accounts |
+| `BOOTSTRAP_ADMIN_*` | First administrator's email, password, first name, and last name |
+| `MAIL_ENABLED` | Enables queued Gmail API delivery |
+| `MAIL_FROM_NAME` | Sender display name; defaults to `TaskFlow` |
+| `GMAIL_SENDER_EMAIL` | Gmail account or configured alias used as the sender |
+| `GMAIL_CLIENT_ID` | Backend-only Google OAuth client ID |
+| `GMAIL_CLIENT_SECRET` | Backend-only Google OAuth client secret |
+| `GMAIL_REFRESH_TOKEN` | Backend-only offline token granted the `gmail.send` scope |
+| `ATTACHMENT_STORAGE_PROVIDER` | `local` or `supabase` |
+| `ATTACHMENT_STORAGE` | Local attachment directory when using `local` |
+| `SUPABASE_URL` | Supabase project URL when using Supabase Storage |
+| `SUPABASE_SECRET_KEY` | Backend-only Supabase secret key |
+| `SUPABASE_STORAGE_BUCKET` | Private bucket name; defaults to `task-attachments` |
+| `MAX_FILE_SIZE` | Maximum individual upload; defaults to `10MB` |
+| `MAX_REQUEST_SIZE` | Maximum multipart request; defaults to `11MB` |
 
 ## Supabase
 
-For a persistent Render service, use the Supabase **Session pooler** connection because it is
-IPv4-compatible. The database name must be part of `DB_URL`; `DB_NAME` is not a Spring datasource
-property used by this application.
+### PostgreSQL
+
+For Render, use Supabase's IPv4-compatible **Session pooler** connection details. The database name
+must be the final path segment of `DB_URL`. `DB_NAME` is not read by Spring's datasource.
 
 ```properties
 DB_URL=jdbc:postgresql://<session-pooler-host>:5432/postgres?sslmode=require
@@ -137,7 +150,14 @@ DB_USERNAME=postgres.<project-reference>
 DB_PASSWORD=<database-password>
 ```
 
-For attachments, create a private bucket and configure:
+A direct Supabase database hostname may resolve only to IPv6 and fail from an IPv4-only hosting
+environment. Copy the host, port, username, and database from the Supabase connection panel instead
+of assembling them from the public project URL.
+
+### Private attachment storage
+
+Create the bucket before enabling the provider; its name must exactly match
+`SUPABASE_STORAGE_BUCKET`.
 
 ```properties
 ATTACHMENT_STORAGE_PROVIDER=supabase
@@ -146,53 +166,58 @@ SUPABASE_SECRET_KEY=<backend-secret-key>
 SUPABASE_STORAGE_BUCKET=task-attachments
 ```
 
-The secret key remains on the backend. The Angular application does not connect directly to the
-database or Supabase Storage.
+Keep the bucket private. The backend secret key is used only by the API, and every upload and
+download is authorized through its task. The frontend does not connect directly to PostgreSQL or
+Supabase Storage. A publishable/anonymous Supabase key is not a replacement for
+`SUPABASE_SECRET_KEY` in this integration.
 
-## Main API routes
+## API overview
 
-| Method  | Route                                        | Access                              |
-| ------- | -------------------------------------------- | ----------------------------------- |
-| `GET`   | `/api/auth/csrf`                             | Public; initializes CSRF protection |
-| `POST`  | `/api/auth/login`                            | Public with a CSRF token            |
-| `POST`  | `/api/auth/mfa/challenge`                    | Public MFA login completion         |
-| `POST`  | `/api/auth/invitations/accept`               | Public invitation completion        |
-| `POST`  | `/api/auth/password-recovery/request`        | Public, enumeration-safe recovery   |
-| `POST`  | `/api/auth/password-recovery/complete`       | Public recovery completion          |
-| `POST`  | `/api/auth/email/confirm`                    | Public email confirmation           |
-| `GET`   | `/api/auth/me`                               | Authenticated user                  |
-| `POST`  | `/api/auth/change-password`                  | Authenticated user                  |
-| `POST`  | `/api/auth/logout`                           | Authenticated with a CSRF token     |
-| `GET`   | `/api/auth/sessions`                         | Current user's sessions             |
-| `DELETE`| `/api/auth/sessions/{id}`                    | Revoke one owned session            |
-| `GET`   | `/api/auth/mfa`                              | Current user's MFA status           |
-| `POST`  | `/api/auth/mfa/setup`                        | Start TOTP enrollment               |
-| `POST`  | `/api/auth/mfa/confirm`                      | Enable TOTP and issue recovery codes|
-| `GET`   | `/api/admin/users`                           | Administrator directory             |
-| `POST`  | `/api/admin/users`                           | Administrator account creation      |
-| `GET`   | `/api/admin/users/{id}`                      | Administrator                       |
-| `PATCH` | `/api/admin/users/{id}`                      | Administrator profile/role update   |
-| `POST`  | `/api/admin/users/{id}/activate`             | Administrator                       |
-| `POST`  | `/api/admin/users/{id}/deactivate`           | Administrator                       |
-| `POST`  | `/api/admin/users/{id}/reset-password`       | Administrator                       |
-| `POST`  | `/api/admin/users/{id}/resend-invitation`    | Administrator                       |
-| `POST`  | `/api/admin/users/{id}/reset-mfa`            | Administrator                       |
-| `GET`   | `/api/admin/users/{id}/audit`                | Administrator timeline              |
-| `GET`   | `/api/users?role=WORKER`                     | Manager                             |
-| `GET`   | `/api/tasks`                                 | Tasks visible to the current user   |
-| `GET`   | `/api/tasks/{id}`                            | Authorized creator or assignee      |
-| `POST`  | `/api/tasks`                                 | Manager                             |
-| `PATCH` | `/api/tasks/{id}/status`                     | Assigned worker                     |
-| `POST`  | `/api/tasks/{id}/attachments`                | Authorized creator or assignee      |
-| `GET`   | `/api/tasks/{id}/attachments/{attachmentId}` | Authorized creator or assignee      |
+All protected mutation routes require a valid session and CSRF token.
 
-Persisted progress follows `ASSIGNED → IN_PROGRESS → COMPLETED`; direct
-`ASSIGNED → COMPLETED` is also valid. `COMPLETED` is final. `OVERDUE` is calculated when an unfinished
-task has passed its deadline.
+| Method | Route | Access |
+| --- | --- | --- |
+| `GET` | `/api/auth/csrf` | Public; initializes CSRF protection |
+| `POST` | `/api/auth/login` | Public login initiation |
+| `POST` | `/api/auth/mfa/challenge` | Public MFA login completion |
+| `POST` | `/api/auth/invitations/accept` | Public invitation completion |
+| `POST` | `/api/auth/password-recovery/request` | Public, enumeration-safe recovery request |
+| `POST` | `/api/auth/password-recovery/complete` | Public recovery completion |
+| `POST` | `/api/auth/email/confirm` | Public email confirmation |
+| `GET` | `/api/auth/me` | Current authenticated user |
+| `POST` | `/api/auth/change-password` | Change the current user's password |
+| `POST` | `/api/auth/logout` | End the current session |
+| `GET` | `/api/auth/sessions` | List the current user's sessions |
+| `DELETE` | `/api/auth/sessions/{id}` | Revoke one owned session |
+| `POST` | `/api/auth/sessions/revoke-others` | Revoke every other owned session |
+| `GET` | `/api/auth/mfa` | Read the current user's MFA state |
+| `POST` | `/api/auth/mfa/setup` | Start TOTP enrollment |
+| `POST` | `/api/auth/mfa/confirm` | Confirm TOTP and issue recovery codes |
+| `POST` | `/api/auth/mfa/disable` | Disable the current user's MFA |
+| `POST` | `/api/auth/mfa/recovery-codes` | Replace recovery codes |
+| `GET`, `POST` | `/api/admin/users` | Administrator directory and account creation |
+| `GET`, `PATCH` | `/api/admin/users/{id}` | Administrator account detail and update |
+| `POST` | `/api/admin/users/{id}/activate` | Administrator activation |
+| `POST` | `/api/admin/users/{id}/deactivate` | Administrator deactivation |
+| `POST` | `/api/admin/users/{id}/reset-password` | Administrator recovery-email request |
+| `POST` | `/api/admin/users/{id}/resend-invitation` | Administrator invitation replacement |
+| `POST` | `/api/admin/users/{id}/reset-mfa` | Administrator MFA/session reset |
+| `GET` | `/api/admin/users/{id}/audit` | Administrator user-audit timeline |
+| `GET` | `/api/users?role=WORKER` | Manager's active-worker directory |
+| `GET`, `POST` | `/api/tasks` | Visible task list; manager creation |
+| `GET` | `/api/tasks/{id}` | Authorized creator or assignee |
+| `PATCH` | `/api/tasks/{id}/status` | Assigned worker |
+| `POST` | `/api/tasks/{id}/attachments` | Authorized creator or assignee |
+| `GET` | `/api/tasks/{id}/attachments/{attachmentId}` | Authorized creator or assignee |
+
+Account safeguards prevent self-deactivation, self-demotion, self-reset, removal of the last active
+administrator, deactivation with unfinished role-related tasks, and role changes after task or
+attachment history. Activation, password, role, MFA, and administrative security changes invalidate
+affected sessions where required.
 
 ## Tests and packaging
 
-Run the complete backend suite:
+The integration suite uses H2 and does not require the local PostgreSQL container:
 
 ```powershell
 .\mvnw.cmd test
@@ -208,15 +233,16 @@ The packaged application is written under `target/`.
 
 ## Deploy on Render
 
-Create a Render Web Service with:
+Because this is a standalone repository, create a Render Web Service with:
 
-- Root Directory: `backend`
-- Runtime: Docker
-- Dockerfile Path: `./Dockerfile`
-- Health Check Path: `/api/auth/csrf`
+- **Root Directory:** leave empty (repository root);
+- **Runtime:** Docker;
+- **Dockerfile Path:** `./Dockerfile`;
+- **Health Check Path:** `/api/auth/csrf`.
 
-Render supplies `PORT`; `application.yml` reads it automatically. Use the Supabase Session pooler URL
-shown above, set the exact Vercel production origin, and use these production security values:
+Render supplies `PORT`, which the application reads automatically. Configure the Supabase Session
+pooler, private attachment bucket, Gmail credentials, stable cryptographic keys, and the exact Vercel
+production origin. Use:
 
 ```properties
 COOKIE_SECURE=true
@@ -224,62 +250,83 @@ COOKIE_SAME_SITE=Strict
 REQUIRE_HTTPS=true
 ```
 
-Do not enable the existing `prod` Spring profile on Render unless you intentionally configure Spring
-with a PKCS12 keystore. Render terminates public TLS before forwarding the request to the container.
+Do not activate the existing `prod` Spring profile on Render unless a PKCS12 keystore is deliberately
+configured. Render normally terminates public TLS and forwards the request to the container.
 
-After deployment, place the Render origin in `frontend/vercel.json` so browser `/api` requests are
-proxied to this service.
+After deployment, set the Render service origin as the `/api` destination in the frontend's
+`vercel.json`.
 
 ### Bootstrap the first administrator
 
-When no active administrator exists, startup requires all four `BOOTSTRAP_ADMIN_*` variables. The
-created account is active but restricted to the password-change flow until it replaces the bootstrap
-password. After that first successful change, remove `BOOTSTRAP_ADMIN_PASSWORD` from Render. The
-initializer becomes a no-op while an active administrator exists.
+When no active administrator exists, startup requires all four variables:
 
-Administrators create pending users. TaskFlow queues a single-use invitation link that expires after
-24 hours; the user chooses their own password when accepting it. Password-reset links expire after 30
-minutes. The email outbox delivers through the Gmail API over HTTPS and retries failures up to five
-times with exponential backoff. Gmail's returned message ID is stored with the outbox record.
+```text
+BOOTSTRAP_ADMIN_EMAIL
+BOOTSTRAP_ADMIN_PASSWORD
+BOOTSTRAP_ADMIN_FIRST_NAME
+BOOTSTRAP_ADMIN_LAST_NAME
+```
 
-### Connect a personal Gmail sender on Render Free
+The account is active but restricted to changing its initial password. After that password change,
+remove `BOOTSTRAP_ADMIN_PASSWORD` from Render. The initializer becomes a no-op while an active
+administrator exists.
 
-Render Free blocks outbound SMTP ports, so TaskFlow uses the Gmail API rather than an App Password.
-Create a Google Cloud project, enable the Gmail API, and configure an External OAuth consent screen
-with only the `https://www.googleapis.com/auth/gmail.send` scope. Set the app publishing status to
-**In production** before generating the final refresh token; tokens issued while the app remains in
-Testing expire after seven days.
+Administrators create pending users and TaskFlow queues a single-use 24-hour invitation. Password
+recovery links expire after 30 minutes. Creating a replacement invitation or recovery link
+invalidates the previous token.
 
-Create a Web application OAuth client and temporarily add
-`https://developers.google.com/oauthplayground` as an authorized redirect URI. In OAuth Playground,
-open its configuration, enable **Use your own OAuth credentials**, select offline access and forced
-consent, authorize `gmail.send`, exchange the code, and copy the refresh token. Remove the Playground
-redirect URI afterward.
+## Gmail API delivery
 
-Configure these Render secrets and redeploy:
+Render Free blocks outbound SMTP ports, so TaskFlow sends through the Gmail API over HTTPS rather
+than Gmail SMTP or an App Password.
+
+1. Create a Google Cloud project and enable the **Gmail API**.
+2. Configure an External OAuth consent screen with
+   `https://www.googleapis.com/auth/gmail.send`.
+3. Add the sender Gmail account as a test user while the consent app is in Testing. For long-lived
+   production credentials, publish the consent app before generating the final refresh token.
+4. Create a Web application OAuth client and temporarily add
+   `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+5. In OAuth Playground, enable **Use your own OAuth credentials**, request offline access and forced
+   consent, authorize the exact `gmail.send` scope, exchange the code, and copy the refresh token.
+6. Remove the temporary Playground redirect URI and configure the following Render secrets:
 
 ```text
 MAIL_ENABLED=true
 MAIL_FROM_NAME=TaskFlow
 GMAIL_SENDER_EMAIL=your-account@gmail.com
-GMAIL_CLIENT_ID=...
-GMAIL_CLIENT_SECRET=...
-GMAIL_REFRESH_TOKEN=...
+GMAIL_CLIENT_ID=<oauth-client-id>
+GMAIL_CLIENT_SECRET=<oauth-client-secret>
+GMAIL_REFRESH_TOKEN=<offline-refresh-token>
 ```
 
-The sender email must be the Gmail account that granted consent (or one of its configured aliases).
-Never use the normal Google password or put OAuth credentials in the frontend. After deployment,
-issue a fresh invitation or recovery email instead of retrying an old failed security-token message.
+The sender must be the Gmail account that granted consent or one of its configured aliases. Never
+use the normal Google password and never expose OAuth credentials to the frontend.
 
-Account safeguards intentionally block self-deactivation, self-demotion, self-reset, removal of the
-last active administrator, deactivation with unfinished role-related tasks, and role changes after any
-task or attachment history. Activation, password, and role changes invalidate previously issued JWTs.
+### Gmail troubleshooting
+
+- **401 Unauthorized:** verify the client ID, client secret, and refresh token belong to the same
+  OAuth client. Revoke and regenerate the token if access was withdrawn.
+- **403 Forbidden or insufficient permissions:** confirm the Gmail API is enabled and generate a new
+  refresh token after explicitly granting `https://www.googleapis.com/auth/gmail.send`. An existing
+  refresh token does not gain scopes when the consent-screen configuration changes.
+- **Token stops working after seven days:** OAuth refresh tokens for an External app left in Testing
+  can expire after seven days. Publish the consent app and issue a new token when appropriate.
+- **Mail still fails after fixing Render:** redeploy, then issue a fresh invitation or recovery
+  request. Do not reuse an expired link or assume an outbox item that exhausted its retries will send
+  automatically.
+- **Bucket not found during attachment upload:** create the private bucket in the same Supabase
+  project and make its name exactly match `SUPABASE_STORAGE_BUCKET`.
 
 ## Security notes
 
-- Never commit `.env`, database passwords, JWT secrets, or Supabase secret keys.
+- Never commit `.env`, database passwords, JWT/MFA keys, Supabase secret keys, Gmail OAuth secrets,
+  refresh tokens, invitation tokens, or recovery codes.
 - Rotate a secret immediately if it appears in a log, screenshot, chat, commit, or issue.
-- Keep the JWT in its `HttpOnly` cookie; do not return it to or store it in the frontend.
-- Keep the Supabase bucket private and authorize every upload and download through the API.
-- Never log invitation/reset tokens, recovery codes, clear-text passwords, or decrypted TOTP secrets.
-- See [`../SECURITY.md`](../SECURITY.md) for the broader security model.
+- Keep the JWT in its `HttpOnly` cookie; do not return it to or store it in browser-readable storage.
+- Keep production HTTPS, secure-cookie, CSRF, CORS, rate-limit, ownership, and audit protections
+  enabled.
+- Treat attachment names and contents as untrusted and keep the Supabase bucket private.
+- Browser developer tools can display data after HTTPS decrypts it at the browser endpoint; HTTPS
+  protects the data while it travels across the network, not from the signed-in user viewing their
+  authorized response.
