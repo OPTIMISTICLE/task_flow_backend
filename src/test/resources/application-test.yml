@@ -49,8 +49,11 @@ app:
     last-name: Admin
   mail:
     enabled: false
-    api-key: test-only
-    from: TaskFlow <no-reply@example.test>
+    from-name: TaskFlow
+    gmail-sender-email: sender@example.test
+    gmail-client-id: test-client-id
+    gmail-client-secret: test-client-secret
+    gmail-refresh-token: test-refresh-token
     frontend-origin: http://localhost:4200
 
 logging:

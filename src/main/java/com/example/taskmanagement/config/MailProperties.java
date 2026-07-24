@@ -5,8 +5,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("app.mail")
 public record MailProperties(
         boolean enabled,
-        String apiKey,
-        String from,
+        String fromName,
+        String gmailSenderEmail,
+        String gmailClientId,
+        String gmailClientSecret,
+        String gmailRefreshToken,
         String frontendOrigin
 ) {
 }

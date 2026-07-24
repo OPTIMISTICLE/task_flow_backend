@@ -92,9 +92,12 @@ manager, not in source control.
 | `JWT_TTL`                     | JWT/cookie lifetime; use `12h` to match the session lifetime    |
 | `SESSION_TTL`                 | Persistent session lifetime; defaults to `12h`                  |
 | `MFA_ENCRYPTION_KEY`          | Base64-encoded 32-byte AES key for TOTP secrets                  |
-| `MAIL_ENABLED`                | Enables queued Resend delivery                                  |
-| `RESEND_API_KEY`              | Backend-only Resend API key                                     |
-| `MAIL_FROM`                   | Verified Resend sender                                          |
+| `MAIL_ENABLED`                | Enables queued Gmail API delivery                               |
+| `MAIL_FROM_NAME`              | Sender display name; defaults to `TaskFlow`                     |
+| `GMAIL_SENDER_EMAIL`          | Gmail account used to send system mail                          |
+| `GMAIL_CLIENT_ID`             | Backend-only Google OAuth client ID                             |
+| `GMAIL_CLIENT_SECRET`         | Backend-only Google OAuth client secret                         |
+| `GMAIL_REFRESH_TOKEN`         | Backend-only offline token with the `gmail.send` scope          |
 | `SEED_USERS`                  | Creates the demo users when enabled and the user table is empty |
 | `SEED_PASSWORD`               | Initial password shared by the seeded demo accounts             |
 | `BOOTSTRAP_ADMIN_EMAIL`       | Initial administrator email when no active administrator exists |
@@ -236,8 +239,37 @@ initializer becomes a no-op while an active administrator exists.
 
 Administrators create pending users. TaskFlow queues a single-use invitation link that expires after
 24 hours; the user chooses their own password when accepting it. Password-reset links expire after 30
-minutes. Configure `MAIL_ENABLED=true`, `RESEND_API_KEY`, and a verified `MAIL_FROM` sender in Render.
-The email outbox retries transient delivery failures and uses an idempotency key for each message.
+minutes. The email outbox delivers through the Gmail API over HTTPS and retries failures up to five
+times with exponential backoff. Gmail's returned message ID is stored with the outbox record.
+
+### Connect a personal Gmail sender on Render Free
+
+Render Free blocks outbound SMTP ports, so TaskFlow uses the Gmail API rather than an App Password.
+Create a Google Cloud project, enable the Gmail API, and configure an External OAuth consent screen
+with only the `https://www.googleapis.com/auth/gmail.send` scope. Set the app publishing status to
+**In production** before generating the final refresh token; tokens issued while the app remains in
+Testing expire after seven days.
+
+Create a Web application OAuth client and temporarily add
+`https://developers.google.com/oauthplayground` as an authorized redirect URI. In OAuth Playground,
+open its configuration, enable **Use your own OAuth credentials**, select offline access and forced
+consent, authorize `gmail.send`, exchange the code, and copy the refresh token. Remove the Playground
+redirect URI afterward.
+
+Configure these Render secrets and redeploy:
+
+```text
+MAIL_ENABLED=true
+MAIL_FROM_NAME=TaskFlow
+GMAIL_SENDER_EMAIL=your-account@gmail.com
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REFRESH_TOKEN=...
+```
+
+The sender email must be the Gmail account that granted consent (or one of its configured aliases).
+Never use the normal Google password or put OAuth credentials in the frontend. After deployment,
+issue a fresh invitation or recovery email instead of retrying an old failed security-token message.
 
 Account safeguards intentionally block self-deactivation, self-demotion, self-reset, removal of the
 last active administrator, deactivation with unfinished role-related tasks, and role changes after any

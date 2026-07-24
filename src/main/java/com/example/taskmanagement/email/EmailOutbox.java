@@ -81,6 +81,9 @@ public class EmailOutbox {
     public String getHtmlBody() { return htmlBody; }
     public int getAttempts() { return attempts; }
     public EmailOutboxStatus getStatus() { return status; }
+    public Instant getNextAttemptAt() { return nextAttemptAt; }
+    public String getProviderMessageId() { return providerMessageId; }
+    public String getLastError() { return lastError; }
 
     private String safe(String value) {
         if (value == null) return null;
