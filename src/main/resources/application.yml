@@ -23,7 +23,7 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:11MB}
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:${PORT:8080}}
   forward-headers-strategy: framework
   error:
     include-message: never
@@ -49,7 +49,12 @@ app:
     api-refill: ${API_RATE_REFILL:120}
     api-period: ${API_RATE_PERIOD:1m}
   storage:
+    provider: ${ATTACHMENT_STORAGE_PROVIDER:local}
     directory: ${ATTACHMENT_STORAGE:./data/attachments}
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}
+      bucket: ${SUPABASE_STORAGE_BUCKET:task-attachments}
   seed:
     enabled: ${SEED_USERS:true}
     password: ${SEED_PASSWORD:SEED_PASSWORD}
