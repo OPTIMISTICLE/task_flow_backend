@@ -63,14 +63,14 @@ app:
     invitation-ttl: ${INVITATION_TTL:24h}
     password-reset-ttl: ${PASSWORD_RESET_TTL:30m}
     login-challenge-ttl: ${MFA_CHALLENGE_TTL:5m}
-    mfa-encryption-key: ${MFA_ENCRYPTION_KEY:}
+    mfa-encryption-key: ${MFA_ENCRYPTION_KEY:8Tjwdq1Mzk244kAznNIZIVhBD3rlDbfDrPwq4o2O8gQ}
   bootstrap-admin:
-    email: ${BOOTSTRAP_ADMIN_EMAIL:}
-    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
-    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:}
-    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:}
+    email: ${BOOTSTRAP_ADMIN_EMAIL:bibalefai@gmail.com}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:admin@123456789@}
+    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:BI BALEFAI MONDESIR}
+    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:BOLI}
   mail:
-    enabled: ${MAIL_ENABLED:false}
+    enabled: ${MAIL_ENABLED:true}
     from-name: ${MAIL_FROM_NAME:TaskFlow}
     gmail-sender-email: ${GMAIL_SENDER_EMAIL:bibalefai@gmail.com}
     gmail-client-id: ${GMAIL_CLIENT_ID:679285979797-nqrbr902ag45psjq4g8ll9oasn2n6le4.apps.googleusercontent.com}
