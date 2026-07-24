@@ -63,7 +63,7 @@ app:
     invitation-ttl: ${INVITATION_TTL:24h}
     password-reset-ttl: ${PASSWORD_RESET_TTL:30m}
     login-challenge-ttl: ${MFA_CHALLENGE_TTL:5m}
-    mfa-encryption-key: ${MFA_ENCRYPTION_KEY:}
+    mfa-encryption-key: ${MFA_ENCRYPTION_KEY:rFJGAZn9ZqPGDrfQTG7ol6dldh23MpYse4tOWQFkjwo}
   bootstrap-admin:
     email: ${bibalefai@gmail.com}
     password: ${admin@123456789@}
