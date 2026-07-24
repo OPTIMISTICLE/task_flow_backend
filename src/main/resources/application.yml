@@ -72,10 +72,10 @@ app:
   mail:
     enabled: ${MAIL_ENABLED:false}
     from-name: ${MAIL_FROM_NAME:TaskFlow}
-    gmail-sender-email: ${GMAIL_SENDER_EMAIL:}
-    gmail-client-id: ${GMAIL_CLIENT_ID:}
-    gmail-client-secret: ${GMAIL_CLIENT_SECRET:}
-    gmail-refresh-token: ${GMAIL_REFRESH_TOKEN:}
+    gmail-sender-email: ${GMAIL_SENDER_EMAIL:bibalefai@gmail.com}
+    gmail-client-id: ${GMAIL_CLIENT_ID:679285979797-nqrbr902ag45psjq4g8ll9oasn2n6le4.apps.googleusercontent.com}
+    gmail-client-secret: ${GMAIL_CLIENT_SECRET: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}
+    gmail-refresh-token: ${GMAIL_REFRESH_TOKEN:1//04xNv6plsK2nkCgYIARAAGAQSNwF-L9IrwYO56g2eLTuyVlPby95FitniInU51kype8G2BLAJBebj_FWa5tcGlDzpZ9aJHL71Q9k}
     frontend-origin: ${FRONTEND_ORIGIN}
 
 logging:
