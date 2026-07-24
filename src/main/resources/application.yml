@@ -65,14 +65,14 @@ app:
     login-challenge-ttl: ${MFA_CHALLENGE_TTL:5m}
     mfa-encryption-key: ${MFA_ENCRYPTION_KEY:}
   bootstrap-admin:
-    email: ${BOOTSTRAP_ADMIN_EMAIL:}
-    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
-    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:}
-    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:}
+    email: ${bibalefai@gmail.com}
+    password: ${admin@123456789@}
+    first-name: ${BI BALEFAI MONDESIR}
+    last-name: ${BOLI}
   mail:
-    enabled: ${MAIL_ENABLED:false}
-    api-key: ${RESEND_API_KEY:}
-    from: ${MAIL_FROM:}
+    enabled: ${MAIL_ENABLED:true}
+    api-key: ${RESEND_API_KEY:re_BpBsoMEC_F94Gw7viboqd1NiYMvwRrUDV}
+    from: ${MAIL_FROM:bibalefai@gmail.com}
     frontend-origin: ${FRONTEND_ORIGIN}
 
 logging:
